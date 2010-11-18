@@ -28,7 +28,7 @@ alreadyrun()
 
 other_running()
 {
-   echo "detected another ssh process."
+	echo "detected another ssh process."
 }
 
 pidsetup()
@@ -36,12 +36,12 @@ pidsetup()
    odied=0
 
    # is other ssh running?
-   otherpid="`ps -ef | grep '/usr/sbin/sshd' | egrep -v '(grep|wan|init.d)' | tail -1 | awk '{print $2};'`"
+  	otherpid="`ps -ef | grep '/usr/sbin/sshd' | egrep -v '(grep|wan|init.d)' | tail -1 | awk '{print $2};'`"
 
-   # is wan ssh running?
-   wanpid="`ps -ef | grep 'sshd_config.wan' | egrep -v '(grep|init.d)' | tail -1 | awk '{print $2};'`"
+	# is wan ssh running?
+	wanpid="`ps -ef | grep 'sshd_config.wan' | egrep -v '(grep|init.d)' | tail -1 | awk '{print $2};'`"
 
-   # re-create pid files from running processes, if pid was found in ps listing
+	# re-create pid files from running processes, if pid was found in ps listing
    test ! -z "$otherpid" && echo "$otherpid" > /var/run/sshd.pid || rm -f /var/run/sshd.pid
    test ! -z "$wanpid" && echo "$wanpid" > $PIDFILE 
 }
@@ -64,17 +64,17 @@ stop_proc()
   
 	# pidfile and proc pid should really agree, but something may have happened 
    if [ "$pid" -ne "$pid" ]; then
-      echo "pidfile and pid do not agree ($pid/$wanpid). Using process pid to terminate ($wanpid)"
+  		echo "pidfile and pid do not agree ($pid/$wanpid). Using process pid to terminate ($wanpid)"
       pid="$wanpid"
    fi
 
 	# try and kill but wait until dead for a few loops
 	count=0
    while  [ "$pid" ]; do
-   	echo "Stopping pid $pid"
+		echo "Stopping pid $pid"
      	kill "$pid"
       pid="`ps -ef | grep 'sshd_config.wan' | egrep -v '(init.d|grep)' | tail -1 | awk '{print $2};'`"
-   	test ! -z "$pid" && echo "aack! it's alive! pid now $pid"
+		test ! -z "$pid" && echo "aack! it's alive! pid now $pid"
 
 		count=`echo "$count+1"|bc`
 
@@ -91,16 +91,16 @@ stop_proc()
 
 case "$1" in
 	start)
-   			test -f $PIDFILE && alreadyrun()
+				test -f $PIDFILE && alreadyrun()
             test -f /var/run/sshd.pid && other_running()
             echo "starting ..."
             /usr/sbin/sshd -f /etc/ssh/sshd_config.wan
             test $? -eq 0 && pidsetup || failed
-            test -f $PIDFILE && echo "success"
+            test -f $PIDFILE && echo "process started on `cat $PIDFILE`"
    ;;
 
    stop)
-        	 	stop_proc
+				stop_proc
    ;;
 
   	reload|force-reload)
@@ -108,22 +108,21 @@ case "$1" in
    ;;
 
   	restart)
-           	echo "i can only start right now"
-                        
-   ;;
-
-  	try-restart)
-            echo "i can only start right now"
-  	;;
-
-  	status)
-  				#status_of_proc -p /var/run/sshd.wan.pid /usr/sbin/sshd sshd && exit 0 || exit $?
-            echo "i can only start right now"
+				echo "i can only start right now"
 	;;
 
-  	*)
-   			echo "Usage: $0 {start|stop|reload|force-reload|restart|try-restart|status}"
-        		exit 1
+	try-restart)
+				echo "i can only start right now"
+	;;
+
+	status)
+				#status_of_proc -p /var/run/sshd.wan.pid /usr/sbin/sshd sshd && exit 0 || exit $?
+				echo "i can only start right now"
+	;;
+
+	*)
+				echo "Usage: $0 {start|stop|reload|force-reload|restart|try-restart|status}"
+				exit 1
 	;;
 esac
 
