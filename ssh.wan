@@ -107,14 +107,12 @@ stop_proc()
 
 start_proc()
 {
-   test -f $PIDFILE && alreadyrun()
-   test -f $OPIDFILE && other_running()
+   test -f $PIDFILE && alreadyrun
+   test -f $OPIDFILE && other_running
    echo "starting ..."
    $DAEMON -f $SSHD_CONFIG
-   test $? -eq 0 && pidsetup || failed
-   test -f $PIDFILE && echo "process started on `cat $PIDFILE`"
-}
-
+   test $? -eq 0 && pidsetup || failed 
+   test -f $PIDFILE && echo "process started on `cat $PIDFILE`" } 
 status()
 {
    fpid=""
@@ -124,25 +122,26 @@ status()
    if [ "$fpid" = "$pid"  ] && [ ! -z "$fpid" ] && [ ! -z "$pid" ];then
       echo "process running on pid $pid"
    else
-		# no pidfile, no process ID
-		if [ ! -f "$PIDFILE" ] && [ -z "$pid" ]; then
-			echo "process not running"
-		fi
 
-		# have a pidfile, but not process ID
+      # no pidfile, no process ID
+      if [ ! -f "$PIDFILE" ] && [ -z "$pid" ]; then
+         echo "process not running"
+      fi
+
+      # have a pidfile, but not process ID
       if [ -f "$PIDFILE" ] && [ -z "$pid" ]; then
          echo "strange: $PIDFILE exists, but process died"
       fi 
 
-		# no pidfile, but have process ID
+      # no pidfile, but have process ID
       if [ ! -f "$PIDFILE" ] && [ ! -z "$pid" ]; then
          echo "strange: $PIDFILE does not exist, but process is running"
       fi 
 
-		# fpid is empty
+      # fpid is empty
       test -z "$fpid"  && echo "$PIDFILE empty or does not exist"
 
-		# process pid is empty
+      # process pid is empty
       test -z "$pid" && echo "process not running"
    fi
 }
@@ -157,10 +156,6 @@ case "$1" in
             stop_proc
    ;;
 
-   reload|force-reload)
-            echo "i can only start right now"
-   ;;
-
    restart)
             stop_proc
             start_proc
@@ -171,7 +166,7 @@ case "$1" in
    ;;
 
    *)
-            echo "Usage: $0 {start|stop|reload|force-reload|restart|try-restart|status}"
+            echo "Usage: $0 {start|stop|restart|status}"
             exit 1
    ;;
 esac
