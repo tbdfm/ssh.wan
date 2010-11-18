@@ -88,11 +88,11 @@ stop_proc()
 
       count=`echo "$count+1"|bc`
 
-		# restore other ssh $OPIDFILE if wanpid is gone but make sure origin
-		if [ -z "$pid" ]; then
-			test -f "$OPIDFILE" && echo "$OPIDFILE was not removed by sshd.wan terminating.  Terminating!" && exit 1
-			test ! -z "$otherpid" && echo "$otherpid" > "$OPIDFILE"
-		fi	
+      # restore other ssh $OPIDFILE if wanpid is gone but make sure origin
+      if [ -z "$pid" ]; then
+         test -f "$OPIDFILE" && echo "$OPIDFILE was not removed by sshd.wan terminating.  Terminating!" && exit 1
+         test ! -z "$otherpid" && echo "$otherpid" > "$OPIDFILE"
+      fi	
 			
       if [ "$count" -gt 3 ]; then
          echo "process not dying so giving up. Will attempt a -9 $pid before exiting."
