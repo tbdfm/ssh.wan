@@ -1,0 +1,7 @@
+I wanted to run two sshd processes listening on different ports with different login setups. The only way to do this is to launch the regular sshd
+daemon through init and then launch the second ssh process by hand when logging in.  You can't start two daemons from the same init script.  The
+second problem is sshd uses the same /var/run/sshd.pid file every time it is started/stopped, so even if you start a second process by hand, it
+whacks the existing pid file.  without a pidfile pointing to the correct sshd daemon, you cannot stop the process with the init script. 
+
+This is an init script which makes provisions to launch a second sshd process, using an alternate sshd_config file (sshd_config.wan),
+and attempts to manage the pid files re-creating them if needed.  
