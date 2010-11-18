@@ -10,7 +10,7 @@
 ### END INIT INFO
 
 # tmb - 2010-11-16 - modified /etc/default/ssh with /etc/default/ssh.wan
-#                    modified with /var/run/sshd.wan.pid cuz it wn't start if sshd.pid
+#                    modified with /var/run/sshd.wan.pid cuz it won't start if sshd.pid
 #                    is  already there (from another sshd process running)
 
 set -e
@@ -58,15 +58,15 @@ failed()
 
 stop_proc()
 {
-	# when we stop, sshd will remove $OPIDFILE so we need to recreate if it's running
+   # when we stop, sshd will remove $OPIDFILE so we need to recreate if it's running
    # get current ssh process and pid from file
-	otherpid="`ps -ef | grep "$DAEMON" | egrep -v '(grep|wan|init.d)' | tail -1 | awk '{print $2};'`"
-	otherfpid=""
-	test -f "$OPIDFILE" && otherfpid="`cat $OPIDFILE`"
+   otherpid="`ps -ef | grep "$DAEMON" | egrep -v '(grep|wan|init.d)' | tail -1 | awk '{print $2};'`"
+   otherfpid=""
+   test -f "$OPIDFILE" && otherfpid="`cat $OPIDFILE`"
 
    # get wan pidfile pid and proc pid to sanity check
    wanpid="`ps -ef | grep $SSHD_CONFIG | egrep -v '(init.d|grep)' | tail -1 | awk '{print $2};'`"
-	pid=""
+   pid=""
    test -f "$PIDFILE" && pid="`cat $PIDFILE`"
 
    test -z "$pid" && echo "No pidfile pid!"
@@ -97,7 +97,7 @@ stop_proc()
       if [ "$count" -gt 3 ]; then
          echo "process not dying so giving up. Will attempt a -9 $pid before exiting."
          kill -9 "$pid"
-         pid=""
+         exit 1
       fi
    done
 
