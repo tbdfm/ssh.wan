@@ -96,7 +96,7 @@ stop_proc()
 			
       if [ "$count" -gt 3 ]; then
          echo "process not dying so giving up. Will attempt a -9 $pid before exiting."
-			kill -9 "$pid"
+         kill -9 "$pid"
          pid=""
       fi
    done
@@ -112,7 +112,10 @@ start_proc()
    echo "starting ..."
    $DAEMON -f $SSHD_CONFIG
    test $? -eq 0 && pidsetup || failed 
-   test -f $PIDFILE && echo "process started on `cat $PIDFILE`" } 
+   test -f $PIDFILE && echo "process started on `cat $PIDFILE`" 
+} 
+
+
 status()
 {
    fpid=""
