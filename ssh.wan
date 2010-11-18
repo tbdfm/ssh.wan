@@ -1,0 +1,120 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides:		sshd
+# Required-Start:	$remote_fs $syslog
+# Required-Stop:	$remote_fs $syslog
+# Default-Start:	2 3 4 5
+# Default-Stop:		1
+# Short-Description:	OpenBSD Secure Shell server
+### END INIT INFO
+
+# tmb - 2010-11-16 - modified /etc/default/ssh with /etc/default/ssh.wan
+#                    modified with /var/run/sshd.wan.pid cuz it wn't start if sshd.pid
+#                    is  already there (from another sshd process running)
+
+set -e
+
+# /etc/init.d/ssh: start and stop the OpenBSD "secure shell(tm)" daemon
+
+export PATH="${PATH:+$PATH:}/usr/sbin:/sbin"
+PIDFILE="/var/run/sshd.wan.pid"
+
+alreadyrun()
+{
+   echo "pidfile $PIDFILE exists.  Please investigate."
+	exit 1
+}
+
+other_running()
+{
+   echo "detected another ssh process."
+}
+
+pidsetup()
+{
+	odied=0
+
+   # is other ssh running?
+	otherpid="`ps -ef | grep '/usr/sbin/sshd' | egrep -v '(grep|wan|init.d)' | tail -1 | awk '{print $2};'`"
+
+	# is wan ssh running?
+	wanpid="`ps -ef | grep 'sshd_config.wan' | egrep -v '(grep|init.d)' | tail -1 | awk '{print $2};'`"
+
+	# re-create pid files from running processes, if pid was found in ps listing
+	test ! -z "$otherpid" && echo "$otherpid" > /var/run/sshd.pid || rm -f /var/run/sshd.pid
+	test ! -z "$wanpid" && echo "$wanpid" > $PIDFILE 
+
+	
+}
+
+failed()
+{
+   echo "Curses!.. Fail!"
+	exit 1
+}
+
+stop_proc()
+{
+   pid=`cat $PIDFILE`
+   wanpid="`ps -ef | grep 'sshd_config.wan' | egrep -v '(init.d|grep)' | tail -1 | awk '{print $2};'`"
+
+   test -z "$pid" && echo "No pidfile pid!"
+   test -z "$wanpid" && echo "No process found. terminating" && exit 0
+   
+   if [ "$pid" -ne "$pid" ]; then
+      echo "pidfile and pid do not agree ($pid/$wanpid). Using process pid to terminate ($wanpid)"
+      pid="$wanpid"
+	fi
+
+	while  [ "$pid" ]; do
+      echo "Stopping pid $pid"
+	   kill "$pid"
+	   pid="`ps -ef | grep 'sshd_config.wan' | egrep -v '(init.d|grep)' | tail -1 | awk '{print $2};'`"
+	   test ! -z "$pid" && echo "aack! it's alive! pid now $pid"
+	done
+
+   # remove pid file
+   rm -f $PIDFILE && echo "Unable to remove pid $PIDFILE !"
+}
+
+
+case "$1" in
+  start)
+				test -f $PIDFILE && alreadyrun()
+
+				test -f /var/run/sshd.pid && other_running()
+   			echo "starting ..."
+				/usr/sbin/sshd -f /etc/ssh/sshd_config.wan
+				test $? -eq 0 && pidsetup || failed
+				test -f $PIDFILE && echo "success"
+	;;
+
+   stop)
+				stop_proc
+
+	;;
+
+  reload|force-reload)
+			echo "i can only start right now"
+	;;
+
+  restart)
+			
+	;;
+
+  try-restart)
+			echo "i can only start right now"
+	;;
+
+  status)
+	#status_of_proc -p /var/run/sshd.wan.pid /usr/sbin/sshd sshd && exit 0 || exit $?
+			echo "i can only start right now"
+	;;
+
+  *)
+	log_action_msg "Usage: /etc/init.d/ssh {start|stop|reload|force-reload|restart|try-restart|status}"
+	exit 1
+esac
+
+exit 0
