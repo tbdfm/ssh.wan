@@ -19,16 +19,19 @@ set -e
 
 export PATH="${PATH:+$PATH:}/usr/sbin:/sbin"
 PIDFILE="/var/run/sshd.wan.pid"
+OPIDFILE="/var/run/sshd.pid"
+DAEMON="/usr/sbin/sshd"
+SSHD_CONFIG="/etc/ssh/sshd_config.wan"
 
 alreadyrun()
 {
-	echo "pidfile $PIDFILE exists.  Please investigate."
+   echo "pidfile $PIDFILE exists.  Please investigate."
    exit 1
 }
 
 other_running()
 {
-	echo "detected another ssh process."
+   echo "detected another ssh process."
 }
 
 pidsetup()
@@ -36,13 +39,13 @@ pidsetup()
    odied=0
 
    # is other ssh running?
-  	otherpid="`ps -ef | grep '/usr/sbin/sshd' | egrep -v '(grep|wan|init.d)' | tail -1 | awk '{print $2};'`"
+   otherpid="`ps -ef | grep "$DAEMON" | egrep -v '(grep|wan|init.d)' | tail -1 | awk '{print $2};'`"
 
-	# is wan ssh running?
-	wanpid="`ps -ef | grep 'sshd_config.wan' | egrep -v '(grep|init.d)' | tail -1 | awk '{print $2};'`"
+   # is wan ssh running?
+   wanpid="`ps -ef | grep $SSHD_CONFIG | egrep -v '(grep|init.d)' | tail -1 | awk '{print $2};'`"
 
-	# re-create pid files from running processes, if pid was found in ps listing
-   test ! -z "$otherpid" && echo "$otherpid" > /var/run/sshd.pid || rm -f /var/run/sshd.pid
+   # re-create pid files from running processes, if pid was found in ps listing
+   test ! -z "$otherpid" && echo "$otherpid" > "$OPIDFILE" || rm -f "$OPIDFILE"
    test ! -z "$wanpid" && echo "$wanpid" > $PIDFILE 
 }
 
@@ -55,75 +58,122 @@ failed()
 
 stop_proc()
 {
-	# get pidfile pid and proc pid to sanity check
-   pid=`cat $PIDFILE`
-   wanpid="`ps -ef | grep 'sshd_config.wan' | egrep -v '(init.d|grep)' | tail -1 | awk '{print $2};'`"
+	# when we stop, sshd will remove $OPIDFILE so we need to recreate if it's running
+   # get current ssh process and pid from file
+	otherpid="`ps -ef | grep "$DAEMON" | egrep -v '(grep|wan|init.d)' | tail -1 | awk '{print $2};'`"
+	otherfpid=""
+	test -f "$OPIDFILE" && otherfpid="`cat $OPIDFILE`"
+
+   # get wan pidfile pid and proc pid to sanity check
+   wanpid="`ps -ef | grep $SSHD_CONFIG | egrep -v '(init.d|grep)' | tail -1 | awk '{print $2};'`"
+	pid=""
+   test -f "$PIDFILE" && pid="`cat $PIDFILE`"
 
    test -z "$pid" && echo "No pidfile pid!"
    test -z "$wanpid" && echo "No process found. terminating" && exit 0
   
-	# pidfile and proc pid should really agree, but something may have happened 
+   # pidfile and proc pid should really agree, but something may have happened 
    if [ "$pid" -ne "$pid" ]; then
-  		echo "pidfile and pid do not agree ($pid/$wanpid). Using process pid to terminate ($wanpid)"
+      echo "pidfile and pid do not agree ($pid/$wanpid). Using process pid to terminate ($wanpid)"
       pid="$wanpid"
    fi
 
-	# try and kill but wait until dead for a few loops
-	count=0
+   # try and kill but wait until dead for a few loops
+   count=0
    while  [ "$pid" ]; do
-		echo "Stopping pid $pid"
-     	kill "$pid"
-      pid="`ps -ef | grep 'sshd_config.wan' | egrep -v '(init.d|grep)' | tail -1 | awk '{print $2};'`"
-		test ! -z "$pid" && echo "aack! it's alive! pid now $pid"
+      echo "Stopping pid $pid"
+      kill "$pid"
+      pid="`ps -ef | grep $SSHD_CONFIG | egrep -v '(init.d|grep)' | tail -1 | awk '{print $2};'`"
+      test ! -z "$pid" && echo "aack! it's alive! pid now $pid"
 
-		count=`echo "$count+1"|bc`
+      count=`echo "$count+1"|bc`
 
-		if [ "$count" -gt 3 ]; then
-			echo "giving up. $pid still running?"
-			pid=""
-		fi
+		# restore other ssh $OPIDFILE if wanpid is gone but make sure origin
+		if [ -z "$pid" ]; then
+			test -f "$OPIDFILE" && echo "$OPIDFILE was not removed by sshd.wan terminating.  Terminating!" && exit 1
+			test ! -z "$otherpid" && echo "$otherpid" > "$OPIDFILE"
+		fi	
+			
+      if [ "$count" -gt 3 ]; then
+         echo "process not dying so giving up. Will attempt a -9 $pid before exiting."
+			kill -9 "$pid"
+         pid=""
+      fi
    done
 
    # remove pid file
    rm -f $PIDFILE || echo "Unable to remove pid $PIDFILE !"
 }
 
+start_proc()
+{
+   test -f $PIDFILE && alreadyrun()
+   test -f $OPIDFILE && other_running()
+   echo "starting ..."
+   $DAEMON -f $SSHD_CONFIG
+   test $? -eq 0 && pidsetup || failed
+   test -f $PIDFILE && echo "process started on `cat $PIDFILE`"
+}
+
+status()
+{
+   fpid=""
+   test -f $PIDFILE && fpid="`cat $PIDFILE`"
+   pid="`ps -ef | grep $SSHD_CONFIG | egrep -v '(init.d|grep)' | tail -1 | awk '{print $2};'`"
+
+   if [ "$fpid" = "$pid"  ] && [ ! -z "$fpid" ] && [ ! -z "$pid" ];then
+      echo "process running on pid $pid"
+   else
+		# no pidfile, no process ID
+		if [ ! -f "$PIDFILE" ] && [ -z "$pid" ]; then
+			echo "process not running"
+		fi
+
+		# have a pidfile, but not process ID
+      if [ -f "$PIDFILE" ] && [ -z "$pid" ]; then
+         echo "strange: $PIDFILE exists, but process died"
+      fi 
+
+		# no pidfile, but have process ID
+      if [ ! -f "$PIDFILE" ] && [ ! -z "$pid" ]; then
+         echo "strange: $PIDFILE does not exist, but process is running"
+      fi 
+
+		# fpid is empty
+      test -z "$fpid"  && echo "$PIDFILE empty or does not exist"
+
+		# process pid is empty
+      test -z "$pid" && echo "process not running"
+   fi
+}
+
 
 case "$1" in
-	start)
-				test -f $PIDFILE && alreadyrun()
-            test -f /var/run/sshd.pid && other_running()
-            echo "starting ..."
-            /usr/sbin/sshd -f /etc/ssh/sshd_config.wan
-            test $? -eq 0 && pidsetup || failed
-            test -f $PIDFILE && echo "process started on `cat $PIDFILE`"
+   start)
+            start_proc
    ;;
 
    stop)
-				stop_proc
+            stop_proc
    ;;
 
-  	reload|force-reload)
-           	echo "i can only start right now"
+   reload|force-reload)
+            echo "i can only start right now"
    ;;
 
-  	restart)
-				echo "i can only start right now"
-	;;
+   restart)
+            stop_proc
+            start_proc
+   ;;
 
-	try-restart)
-				echo "i can only start right now"
-	;;
+   status)
+				status
+   ;;
 
-	status)
-				#status_of_proc -p /var/run/sshd.wan.pid /usr/sbin/sshd sshd && exit 0 || exit $?
-				echo "i can only start right now"
-	;;
-
-	*)
-				echo "Usage: $0 {start|stop|reload|force-reload|restart|try-restart|status}"
-				exit 1
-	;;
+   *)
+            echo "Usage: $0 {start|stop|reload|force-reload|restart|try-restart|status}"
+            exit 1
+   ;;
 esac
 
 exit 0
